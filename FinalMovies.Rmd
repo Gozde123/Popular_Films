@@ -1,0 +1,190 @@
+---
+title: "Movie Data"
+author: "Gözde Nur Özdemir"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    highlight: monochrome
+    theme: cosmo
+---
+
+```{r setup, include=F,eval=T}
+dt1<-read.csv("C:/Users/gozde/Desktop/movies_dataset_faggle/Movies_dataset.csv")
+```
+
+-   This data set can be download from [here](%5Bhttps://www.kaggle.com/datasets/nagrajdesai/latest-10000-movies-dataset-from-tmdb?resource=download%5D(http://127.0.0.1:23433/#0%20%22https://www.kaggle.com/datasets/nagrajdesai/latest-10000-movies-dataset-from-tmdb?resource=download%22))
+
+    [![](20150804224608-movies.jpeg){width="600"}](https://www.yandex.com.tr/gorsel/search?from=tabbar&img_url=https%3A%2F%2Fkpravda.ru%2Fwp-content%2Fuploads%2F2020%2F01%2Fkinoteatr-scaled.jpg&lr=104782&pos=0&rpt=simage&text=movies)
+
+    # Overview of the Data
+
+1.  Index: Index of the each row.
+
+2.  Title: Title of the movies.
+
+3.  Original Language: Gives us the language of movies.
+
+4.  Release Date: When the movie was officially released for public viewing.
+
+5.  Popularity: The measure of how well-known or talked-about a particular movie is within a given context.
+
+6.  Vote Average: The average rating or score given to the movie by viewers who have voted.
+
+7.  Vote Count: The number of votes or ratings that the movie has received from viewers.
+
+8.  Overview: Summary or description of the movie plot, themes, and overall content.
+
+    # Requirements
+
+    ```{r echo = T, results = 'hide',message=FALSE, warning=FALSE}
+    # Please first download required library
+    library(tidyverse)
+    library(ggplot2)
+    library(dplyr)
+    library(rvest)
+    library(stringr)
+    library(corrplot)
+    ```
+
+    # My Findings
+
+    First reorganize the data.
+
+    ```{r}
+    dt1$index<-1:10000
+    which(is.na(dt1))
+    # There is no any NA values
+    which(is.null(dt1))
+    # There is no any NULL values
+    dt1$original_language<-factor(dt1$original_language)
+    summary(dt1)
+    ```
+
+    As we can see there are many English movies were made.
+
+    ```{r,fig.width = 15, fig.height = 10,warning=F}
+    plot1 <- ggplot(data = dt1, aes(x = original_language)) +
+      geom_bar(aes(fill = original_language),stat = "count") +
+      geom_text(stat = "count", aes(label = stat(count)),
+                vjust = -0.5, size = 3, color = "black") +
+      xlab("Original Language") +
+      ylab("Count")+labs(title="Original Language vs Count")+
+      guides(fill=guide_legend(title="Original Language"))
+     
+
+    plot1
+
+
+    ```
+
+Now we can look at the table.
+
+```{r}
+popular_film<-ifelse(dt1$vote_average>mean(dt1$vote_average),dt1$index,NA)
+popular_film<-na.omit(popular_film)
+popular_film_lan<-dt1$original_language[popular_film]
+table(popular_film_lan)
+
+```
+
+As we can understand from the plot and table popular films are mostly English. This may have 2 reasons first reason is English is worldwide language, but second maybe people speak English are mostly love their films so they give higher vote. This affect the vote average so to understand which reason is true we also have to look at the vote count to be more robust.
+
+```{r}
+popular_film_vote_count<-dt1$vote_count[popular_film]
+popular<-data.frame(voteCount=popular_film_vote_count,language=popular_film_lan)
+popularVoteCount<-popular[popular$voteCount>mean(popular_film_vote_count),]
+rate_of_movie<-na.omit(summary(popularVoteCount$language)/summary(popular$language))
+rate_of_movie
+```
+
+English has the highest rate outside of other films So English is more popular because of the first reason to be more precise let's look at the statistics As per the research conducted in 2022, 17% of the world's population, i.e., 1.5 billion people, speak the English language worldwide [Research conducted by Statista](https://www.statista.com/statistics/266808/the-most-spoken-languages-worldwide/) since English is 34% so it is more than the result above.
+
+```{r}
+cor_matrix<-data.frame(popularity=dt1$popularity,average=dt1$vote_average,count=dt1$vote_count)
+cor_matrix<-cor(cor_matrix)
+corrplot(cor_matrix)
+```
+
+Moreover, this is the correlation matrix.
+
+# Which Year The Most Popular Films Were Made?
+
+```{r,message=F,error=F}
+popular_film_date<-dt1$release_date[popular_film]
+date<-unlist(strsplit(popular_film_date, split = "-"))
+date<-as.integer(date)
+year<-ifelse(date>1000,date,NA)
+year<-na.omit(year) %>% factor()
+plot(year,col="purple",col.main="purple")+title("YEAR")
+```
+
+As we can see in 2022, the most films are made. In 2023,2021,2019,2018 also more film made but why in 2022 were made more films? This is mainly about pandemic. After the pandemic film industry came back in 2022. Also blocbuster movies were came back after the covid-19. For more information please check [the website](https://www.linkedin.com/pulse/what-can-we-expect-movies-2022-film-industry-news-konnectdigital)
+
+# Most Popular Genre in 2022
+
+```{r}
+link="https://www.movieinsider.com/movies/2022"
+page=read_html(link)
+name=page %>% html_nodes('.col-md-5 a , .label-default') %>% html_text()
+web_data<-data.frame(title=name[seq(1,length(name)-1,2)],genre=name[seq(2,length(name),2)])
+popular_film_title<-dt1$title[popular_film]
+popular_data<-data.frame(title=popular_film_title,date=popular_film_date)
+web_data$title<-trimws(web_data$title)
+popular_data$date <- substr(popular_data$date, start = 7, stop = 10)
+popular_data$date<-ifelse(popular_data$date==2022,2022,NA)
+popular_dat1a<-na.omit(popular_data)
+common_titles <- intersect(popular_data$title, web_data$title)
+common_titles_genre <- web_data[web_data$title %in% common_titles, c("title", "genre")]
+common_titles_genre$genre<-factor(common_titles_genre$genre)
+summary(common_titles_genre)
+```
+
+As we can understand in 2022 popular films' genre is drama. And then action,adaption,thriller and so on. But why drama is more popular genre in 2022. Since drama based on real event so world community most likes the drama genre film. So if film makers want to make film, they should choose mainly drama type. For more information about this popular genre type please visit [the web site](https://medium.com/@bagas.darmawann/genre-trends-in-global-film-production-adf35af492c8)
+
+#   R**ecommendation System**
+
+First we need to make data frame for the new data.
+
+```{r}
+# vote average
+v<-vector()
+k<-0
+m<-0
+for(i in common_titles_genre$title){
+  m<-m+1
+  k<-0
+  for(l in dt1$title){
+    k<-k+1
+    if(i==l){
+      v[m]<-dt1$vote_average[k]
+    }else{
+      next
+    }
+  }
+}
+v<-na.omit(v)
+common_titles_genre$voteAverage<-v
+# language
+dt1$original_language<-as.character(dt1$original_language)
+v<-vector()
+k<-0
+m<-0
+for(i in common_titles_genre$title){
+  m<-m+1
+  k<-0
+  for(l in dt1$title){
+    k<-k+1
+    if(i==l){
+      v[m]<-dt1$original_language[k]
+    }else{
+      next
+    }
+  }
+}
+v<-na.omit(v)
+common_titles_genre$language<-v
+common_titles_genre
+
+```
+
+We can find more easily their type and their information.
